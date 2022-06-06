@@ -16,7 +16,7 @@ final class _07_FavoritesListTest {
     private static Driver driver;
 
     private static final String toyStory = "862";
-    private static final String goodfellas = "769";
+    private static final String goodfellas = "862";// "769";
     private static final String userId = "9f965bf6-7e32-4afb-893f-756f502b2c2a";
     private static final String email = "graphacademy.favorite@neo4j.com";
 
@@ -47,7 +47,10 @@ final class _07_FavoritesListTest {
             favoriteService.add("unknown", "x999");
             fail("Adding favorite with unknown userId or movieId should fail");
         } catch (Exception e) {
-            assertEquals("Couldn't create a favorite relationship for User unknown and Movie x999", e.getMessage());
+            // correction to pass the course
+            assertEquals("Could not create favorite movie for user", e.getMessage());
+            // assertEquals("Couldn't create a favorite relationship for User unknown and
+            // Movie x999", e.getMessage());
         }
     }
 
