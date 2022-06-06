@@ -51,7 +51,12 @@ public class MovieService {
         // DONE: Get a list of Movies from the Result
         // DONE: Close the session
         try (var session = driver.session()) {
+
             var movies = session.readTransaction(tx -> {
+
+                // Get an array of IDs for the User's favorite movies
+                var favorites = getUserFavorites(tx, userId);
+
                 // Retrieve a list of movies with the
                 // favorite flag appened to the movie's properties
                 Params.Sort sort = params.sort(Params.Sort.title);
@@ -59,14 +64,15 @@ public class MovieService {
                         MATCH (m:Movie)
                         WHERE m.`%s` IS NOT NULL
                         RETURN m {
-                        .*
+                          .*,
+                          favorite: m.tmdbId IN $favorites
                         } AS movie
                         ORDER BY m.`%s` %s
                         SKIP $skip
                         LIMIT $limit
                         """, sort, sort, params.order());
-                var res = tx.run(query, Values.parameters("skip", params.skip(), "limit",
-                        params.limit()));
+                var res = tx.run(query,
+                        Values.parameters("skip", params.skip(), "limit", params.limit(), "favorites", favorites));
                 // Get a list of Movies from the Result
                 return res.list(row -> row.get("movie").asMap());
             });
@@ -236,7 +242,16 @@ public class MovieService {
      */
     // tag::getUserFavorites[]
     private List<String> getUserFavorites(Transaction tx, String userId) {
-        return List.of();
+        // return List.of();
+        // If userId is not defined, return an empty list
+        if (userId == null)
+            return List.of();
+        var favoriteResult = tx.run("""
+                    MATCH (u:User {userId: $userId})-[:HAS_FAVORITE]->(m)
+                    RETURN m.tmdbId AS id
+                """, Values.parameters("userId", userId));
+        // Extract the `id` value returned by the cypher query
+        return favoriteResult.list(row -> row.get("id").asString());
     }
     // end::getUserFavorites[]
 
