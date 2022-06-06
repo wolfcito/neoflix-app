@@ -2,8 +2,12 @@ package neoflix.services;
 
 import neoflix.AppUtils;
 import neoflix.AuthUtils;
+import neoflix.ValidationException;
+
 import org.neo4j.driver.Driver;
 import org.neo4j.driver.Values;
+import org.neo4j.driver.exceptions.ClientException;
+import org.neo4j.driver.exceptions.Neo4jException;
 
 import java.util.List;
 import java.util.Map;
@@ -68,6 +72,13 @@ public class AuthService {
             String token = AuthUtils.sign(sub, userToClaims(user), jwtSecret);
 
             return userWithToken(user, token);
+        } catch (ClientException e) {
+            // Handle unique constraints in the database
+            if (e.code().equals("Neo.ClientError.Schema.ConstraintValidationFailed")) {
+                throw new ValidationException("An account already exists with the email address",
+                        Map.of("email", "Email address already taken"));
+            }
+            throw e;
         }
     }
     // end::register[]
