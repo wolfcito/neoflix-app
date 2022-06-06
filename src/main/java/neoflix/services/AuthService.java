@@ -8,6 +8,7 @@ import org.neo4j.driver.Driver;
 import org.neo4j.driver.Values;
 import org.neo4j.driver.exceptions.ClientException;
 import org.neo4j.driver.exceptions.Neo4jException;
+import org.neo4j.driver.exceptions.NoSuchRecordException;
 
 import java.util.List;
 import java.util.Map;
@@ -105,20 +106,41 @@ public class AuthService {
      */
     // tag::authenticate[]
     public Map<String, Object> authenticate(String email, String plainPassword) {
-        // TODO: Authenticate the user from the database
-        var foundUser = users.stream().filter(u -> u.get("email").equals(email)).findAny();
-        if (foundUser.isEmpty())
-            throw new RuntimeException("Cannot retrieve a single record, because this result is empty.");
-        var user = foundUser.get();
-        if (!plainPassword.equals(user.get("password")) &&
-                !AuthUtils.verifyPassword(plainPassword, (String) user.get("password"))) { //
-            throw new RuntimeException("Incorrect password");
+        // DONE: Authenticate the user from the database
+        // var foundUser = users.stream().filter(u ->
+        // u.get("email").equals(email)).findAny();
+        // if (foundUser.isEmpty())
+        // throw new RuntimeException("Cannot retrieve a single record, because this
+        // result is empty.");
+        // var user = foundUser.get();
+        // if (!plainPassword.equals(user.get("password")) &&
+        // !AuthUtils.verifyPassword(plainPassword, (String) user.get("password"))) { //
+        // throw new RuntimeException("Incorrect password");
+        // }
+        // Open a new Session
+        try (var session = this.driver.session()) {
+            // Find the User node within a Read Transaction
+            var user = session.readTransaction(tx -> {
+                String statement = "MATCH (u:User {email: $email}) RETURN u";
+                var res = tx.run(statement, Values.parameters("email", email));
+                return res.single().get("u").asMap();
+
+            });
+
+            // Check password
+            if (!AuthUtils.verifyPassword(plainPassword, (String) user.get("password"))) {
+                throw new ValidationException("Incorrect password", Map.of("password", "Incorrect password"));
+            }
+
+            // tag::return[]
+            String sub = (String) user.get("userId");
+            String token = AuthUtils.sign(sub, userToClaims(user), jwtSecret);
+            return userWithToken(user, token);
+            // end::return[]
+        } catch (NoSuchRecordException e) {
+            throw new ValidationException("Incorrect email", Map.of("email", "Incorrect email"));
         }
-        // tag::return[]
-        String sub = (String) user.get("userId");
-        String token = AuthUtils.sign(sub, userToClaims(user), jwtSecret);
-        return userWithToken(user, token);
-        // end::return[]
+
     }
     // end::authenticate[]
 
